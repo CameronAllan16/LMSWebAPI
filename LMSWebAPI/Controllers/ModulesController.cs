@@ -32,8 +32,6 @@ namespace WebApi.Controllers
         public Module GetModule(int id)
         {
             return _modules.Find(module => module.Id == id);
-
-            
         }
 
 

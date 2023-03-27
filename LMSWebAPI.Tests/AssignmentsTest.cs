@@ -15,7 +15,7 @@ namespace LMSWebAPI.Tests
         private AssignmentsController _controller;
 
         [Fact]
-        public void Setup()
+        public void Init()
         {
             _controller = new AssignmentsController();
         }
