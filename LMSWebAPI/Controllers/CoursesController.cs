@@ -1,4 +1,6 @@
+using LMSWebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApi.Models;
 
 namespace WebApi.Controllers
@@ -7,51 +9,90 @@ namespace WebApi.Controllers
     [ApiController]
     public class CoursesController : ControllerBase
     {
-        private static List<Course> _courses = new List<Course>
-        {
-            new Course { Id = 1, Name = "Introduction to Programming" },
-            new Course { Id = 2, Name = "Database Management" },
-            new Course { Id = 3, Name = "Web Development" }
-        };
 
-        [HttpGet]
-        public IEnumerable<Course> GetAllCourses()
+        private readonly LMSContext _context;
+         
+        public CoursesController(LMSContext context)
         {
-            return _courses;
+            _context = context;
+        }
+       
+        [HttpGet]
+        public async  Task<ActionResult<IEnumerable<Course>>> GetAllCourses()
+        {
+            return  await _context.Courses.ToListAsync();
         }
 
 
         // GET: Get course by ID
         [HttpGet("{id}")]
-        public Course GetCourse(int id)
+        public async Task<ActionResult<Course>> GetCourse(int id)
         {
-            return _courses.Find(course => course.Id == id);
+            var course = await _context.Courses.FindAsync(id);
+
+            if (course == null)
+            {
+                return NotFound();
+            }
+            return course;
         }
 
 
         // PUT: Update Course
         [HttpPut("{id}")]
-        public IEnumerable<Course> UpdateCourse(int oldId, Course course)
+        public async Task<IActionResult> UpdateCourse(int oldId, Course course)
         {
-            int index = _courses.FindIndex(course => course.Id == oldId);
-            _courses[index] = course;
-            return _courses;
+            if (oldId != course.Id)
+            {
+                return BadRequest();
+            }
+
+            _context.Entry(course).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Courses.Any(c =>  c.Id == oldId))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
         // POST: Add Course
         [HttpPost]
-        public IEnumerable<Course> AddCourse(Course course)
+        public async Task<ActionResult<Course>> AddCourse(Course course)
         {
-            _courses.Add(course);
-            return _courses;
+            _context.Courses.Add(course);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetCourse), new { id = course.Id }, course);
         }
 
         // DELETE: api/Courses/5
         [HttpDelete("{id}")]
-        public IEnumerable<Course> DeleteCourse(int id)
+        public async Task<ActionResult<Course>> DeleteCourse(int id)
         {
-            _courses.RemoveAll(course => course.Id == id);
-            return _courses;
+            var course = await _context.Courses.FindAsync(id);
+
+            if (course == null)
+            {
+                return NotFound();
+            }
+
+            _context.Courses.Remove(course);
+            await _context.SaveChangesAsync();
+
+            return course;
         }
     }
 }
