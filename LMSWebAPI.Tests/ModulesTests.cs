@@ -1,9 +1,6 @@
-﻿using Microsoft.AspNetCore.Routing;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using LMSWebAPI.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApi.Controllers;
 using WebApi.Models;
 
@@ -12,47 +9,96 @@ namespace LMSWebAPI.Tests
     public class ModulesTests
     {
 
-        private ModulesController _controller;
+        private DbContextOptionsBuilder<LMSContext> _optionsBuilder;
 
-
-        public void Init()
+        public ModulesTests()
         {
-            _controller = new ModulesController();
+            // Set up the in-memory database
+            _optionsBuilder = new DbContextOptionsBuilder<LMSContext>()
+                .UseInMemoryDatabase("TestDatabase");
         }
 
         [Fact]
-        public void GetModuleMethod_ReturnsModule()
+        public async Task GetModuleById_ReturnsNotFoundResult_WhenModuleNotFound()
         {
-            int moduleId = 2;
-            Module expectedModule = new Module { Id = 2, CourseId = 1, Name = "Control Flow and Loops" };
+            // Arrange
+            using (var context = new LMSContext(_optionsBuilder.Options))
+            {
+                var controller = new ModulesController(context);
 
-            Module actualModule = _controller.GetModule(1);
+                // Act
+                var result = await controller.GetModule(1);
 
-            Assert.Equal(actualModule.CourseId, expectedModule.CourseId);
-            Assert.Equal(actualModule.Id, expectedModule.Id);
-            Assert.Equal(actualModule.Name, expectedModule.Name);
+                // Assert
+                Assert.IsType<NotFoundResult>(result.Result);
+            }
         }
 
         [Fact]
-        public void AddModuleMethod_AddsModuleToList()
+        public async Task GetModuleById_ReturnsModule_WhenModuleFound()
         {
-            var moduleToAdd = new Module { CourseId = 1, Id = 4, Name = "Circles" };
+            // Arrange
+            using (var context = new LMSContext(_optionsBuilder.Options))
+            {
+                // Add a module to the in-memory database
+                var module = new Module { Name = "Test Module" };
+                context.Modules.Add(module);
+                await context.SaveChangesAsync();
 
-            var result = _controller.PostModule(moduleToAdd);
+                var controller = new ModulesController(context);
 
-            Assert.Contains(moduleToAdd, result);
-            Assert.Equal( 4 , result.Count());
+                // Act
+                var result = await controller.GetModule(module.Id);
+
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(result.Result);
+                var returnedModule = Assert.IsType<Module>(okResult.Value);
+                Assert.Equal(module.Id, returnedModule.Id);
+                Assert.Equal(module.Name, returnedModule.Name);
+            }
         }
 
         [Fact]
-        public void DeleteModuleMethod_RemovesModule()
+        public async Task GetModuleAssignments_ReturnsNotFoundResult_WhenModuleNotFound()
         {
-            var moduleId = 3;
+            // Arrange
+            using (var context = new LMSContext(_optionsBuilder.Options))
+            {
+                var controller = new ModulesController(context);
 
-            var result = _controller.DeleteModule(moduleId);
+                // Act
+                var result = await controller.GetModuleAssignments(1);
 
-            Assert.Equal( null , result.FirstOrDefault(module => module.Id == moduleId));
-            Assert.Equal( 2, result.Count());
+                // Assert
+                Assert.IsType<NotFoundResult>(result.Result);
+            }
+        }
+
+        [Fact]
+        public async Task GetModuleAssignments_ReturnsAssignments_WhenModuleFound()
+        {
+            // Arrange
+            using (var context = new LMSContext(_optionsBuilder.Options))
+            {
+                // Add a module and some assignments to the in-memory database
+                var module = new Module { Name = "Test Module" };
+                var assignment1 = new Assignment { Name = "Test Assignment 1", ModuleId = module.Id };
+                var assignment2 = new Assignment { Name = "Test Assignment 2", ModuleId = module.Id };
+                context.Modules.Add(module);
+                context.Assignments.Add(assignment1);
+                context.Assignments.Add(assignment2);
+                await context.SaveChangesAsync();
+
+                var controller = new ModulesController(context);
+
+                // Act
+                var result = await controller.GetModuleAssignments(module.Id);
+
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(result.Result);
+                var returnedAssignments = Assert.IsAssignableFrom<IEnumerable<Assignment>>(okResult.Value);
+                Assert.Equal(2, returnedAssignments.Count());
+            }
         }
     }
 }
